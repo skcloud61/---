@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% block content %}
-
 <!-- ── 필터 ── -->
 <div class="container mt-4">
   <form method="GET" action="/" class="row g-2 mb-4">
@@ -58,23 +57,49 @@
             </button>
           </div>
 
-          <!-- 댓글 목록 -->
+          <!-- ── 댓글 목록 ── -->
           <div class="comment-section">
             <div class="comment-list mb-2">
               {% for comment in pdf.comments %}
-              <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                <div>
-                  <span class="fw-bold small me-1">{{ comment.user.username }}</span>
-                  <span class="small">{{ comment.content }}</span>
+              <div class="border-bottom py-1" id="comment-{{ comment.id }}">
+
+                <!-- 댓글 텍스트 줄 -->
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <span class="fw-bold small me-1">{{ comment.user.username }}</span>
+                    <span class="small" id="comment-text-{{ comment.id }}">{{ comment.content }}</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="text-muted small">{{ comment.created_at.strftime('%m/%d') }}</span>
+                    {% if session.is_admin or comment.user_id == session.user_id %}
+                      <!-- ✏️ 수정 버튼 -->
+                      <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                              onclick="showEditComment({{ comment.id }}, '{{ comment.content|replace("'", "\\'") }}')">
+                        ✏️
+                      </button>
+                      <!-- 🗑️ 삭제 버튼 -->
+                      <a href="/delete_comment/{{ comment.id }}"
+                         class="btn btn-sm btn-outline-danger py-0 px-1"
+                         onclick="return confirm('댓글을 삭제할까요?')">✕</a>
+                    {% endif %}
+                  </div>
                 </div>
-                <div class="d-flex align-items-center gap-1">
-                  <span class="text-muted small">{{ comment.created_at.strftime('%m/%d') }}</span>
-                  {% if session.is_admin or comment.user_id == session.user_id %}
-                    <a href="/delete_comment/{{ comment.id }}"
-                       class="btn btn-sm btn-outline-danger py-0 px-1"
-                       onclick="return confirm('댓글을 삭제할까요?')">✕</a>
-                  {% endif %}
-                </div>
+
+                <!-- 수정 폼 (기본 숨김) -->
+                {% if session.is_admin or comment.user_id == session.user_id %}
+                <form method="POST" action="/edit_comment/{{ comment.id }}"
+                      id="edit-form-{{ comment.id }}"
+                      class="d-none mt-1 d-flex gap-1">
+                  <input type="text" name="content"
+                         class="form-control form-control-sm"
+                         id="edit-input-{{ comment.id }}"
+                         maxlength="300" required>
+                  <button type="submit" class="btn btn-dark btn-sm">저장</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm"
+                          onclick="hideEditComment({{ comment.id }})">취소</button>
+                </form>
+                {% endif %}
+
               </div>
               {% endfor %}
             </div>
@@ -104,13 +129,13 @@
   {% endif %}
 </div>
 
-<!-- ── 좋아요 JS ── -->
+<!-- ── JS ── -->
 <script>
+// 좋아요
 function toggleLike(pdfId, btn) {
     fetch(`/like/${pdfId}`, { method: 'POST' })
     .then(r => r.json())
     .then(data => {
-        btn.querySelector('.like-count').textContent = data.count;
         if (data.liked) {
             btn.innerHTML = '❤️ <span class="like-count">' + data.count + '</span>';
             btn.classList.add('btn-danger');
@@ -122,6 +147,16 @@ function toggleLike(pdfId, btn) {
         }
     });
 }
-</script>
 
+// 댓글 수정 폼 열기
+function showEditComment(id, content) {
+    document.getElementById('edit-form-' + id).classList.remove('d-none');
+    document.getElementById('edit-input-' + id).value = content;
+}
+
+// 댓글 수정 폼 닫기
+function hideEditComment(id) {
+    document.getElementById('edit-form-' + id).classList.add('d-none');
+}
+</script>
 {% endblock %}
