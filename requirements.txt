@@ -1,7 +1,6 @@
 flask
 flask-sqlalchemy
 werkzeug
-python-magic-bin
 reportlab
 pypdf2
 cloudinary
