@@ -1,0 +1,8 @@
+flask
+flask-sqlalchemy
+werkzeug
+python-magic
+reportlab
+pypdf2
+cloudinary
+gunicorn

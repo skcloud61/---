@@ -11,26 +11,29 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from PyPDF2 import PdfReader, PdfWriter
+# ── ✅ 변경 1: Cloudinary 추가 ──
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 app = Flask(__name__)
-
-# ── 1. Secret Key 환경변수로 분리 ──
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
-
-# ── 세션 보안 설정 ──
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
 db = SQLAlchemy(app)
 os.makedirs('uploads', exist_ok=True)
 
-# ──────────────────────────────
-# 한글 폰트 등록
-# ──────────────────────────────
+# ── ✅ 변경 2: Cloudinary 설정 추가 ──
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dspi76gpo'),
+    api_key    = os.environ.get('CLOUDINARY_API_KEY', '129521586826764'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET', 'y080TBqpcuuOLb3thTzbGISFE8Q')
+)
+
 pdfmetrics.registerFont(TTFont('NanumGothic', 'NanumGothic.ttf'))
 
 # ──────────────────────────────
@@ -97,7 +100,6 @@ class VisitLog(db.Model):
     visited_at = db.Column(db.DateTime, default=datetime.utcnow)
     user       = db.relationship('User', backref='visit_logs')
 
-# ── 로그인 실패 기록 모델 ──
 class LoginFailLog(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     username  = db.Column(db.String(50), nullable=False)
@@ -125,7 +127,6 @@ with app.app_context():
 # 방문 기록 자동 저장
 # ──────────────────────────────
 EXCLUDE_PATHS = ['/static', '/favicon.ico', '/admin/visits', '/admin/loginfails']
-
 @app.before_request
 def log_visit():
     for path in EXCLUDE_PATHS:
@@ -152,7 +153,6 @@ def login_required(f):
     return decorated
 
 ADMIN_IPS = ['127.0.0.1', '::1', '121.165.139.150']
-
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -198,7 +198,7 @@ GRADES = [
     '중학교 1학년', '중학교 2학년', '중학교 3학년',
     '고등학교 1학년'
 ]
-CATEGORIES  = ['단원평가', '단원정리', '퀵테스트', '기타']
+CATEGORIES   = ['단원평가', '단원정리', '퀵테스트', '기타']
 ALLOWED_MIME = {'application/pdf'}
 
 # ──────────────────────────────
@@ -236,37 +236,20 @@ def login():
         password = request.form['password']
         ip       = request.remote_addr
         user     = User.query.filter_by(username=username).first()
-
         if not user:
-            # ── 존재하지 않는 아이디 ──
-            db.session.add(LoginFailLog(
-                username=username,
-                ip=ip,
-                reason='존재하지 않는 아이디'
-            ))
+            db.session.add(LoginFailLog(username=username, ip=ip, reason='존재하지 않는 아이디'))
             db.session.commit()
             flash('아이디 또는 비밀번호가 올바르지 않습니다.', 'error')
-
         elif user.is_banned:
             ban_msg = '영구 정지' if user.ban_type == 'permanent' else '일시 정지'
-            db.session.add(LoginFailLog(
-                username=username,
-                ip=ip,
-                reason=f'정지된 계정 ({ban_msg})'
-            ))
+            db.session.add(LoginFailLog(username=username, ip=ip, reason=f'정지된 계정 ({ban_msg})'))
             db.session.commit()
             flash(f'이용이 {ban_msg}된 계정입니다.', 'error')
-
         elif user.locked_until and datetime.utcnow() < user.locked_until:
             remaining = (user.locked_until - datetime.utcnow()).seconds // 60
-            db.session.add(LoginFailLog(
-                username=username,
-                ip=ip,
-                reason=f'잠금 상태 ({remaining}분 남음)'
-            ))
+            db.session.add(LoginFailLog(username=username, ip=ip, reason=f'잠금 상태 ({remaining}분 남음)'))
             db.session.commit()
             flash(f'로그인 시도가 너무 많습니다. {remaining}분 후 다시 시도해주세요.', 'error')
-
         elif not check_password_hash(user.password, password):
             user.login_attempts += 1
             reason = f'비밀번호 오류 ({user.login_attempts}/5)'
@@ -277,15 +260,9 @@ def login():
                 flash('로그인 5회 실패. 15분간 잠금됩니다.', 'error')
             else:
                 flash(f'아이디 또는 비밀번호가 올바르지 않습니다. ({user.login_attempts}/5)', 'error')
-            db.session.add(LoginFailLog(
-                username=username,
-                ip=ip,
-                reason=reason
-            ))
+            db.session.add(LoginFailLog(username=username, ip=ip, reason=reason))
             db.session.commit()
-
         else:
-            # ── 로그인 성공 시 세션 재생성 ──
             session.clear()
             user.login_attempts = 0
             user.locked_until   = None
@@ -295,7 +272,6 @@ def login():
             session['is_admin'] = user.is_admin
             flash(f'{user.username}님, 환영합니다!', 'success')
             return redirect(url_for('index'))
-
     return render_template('login.html')
 
 # ──────────────────────────────
@@ -309,7 +285,6 @@ def register():
         username         = request.form['username'].strip()
         password         = request.form['password']
         password_confirm = request.form['password_confirm']
-
         if len(username) < 3 or len(username) > 20:
             flash('아이디는 3~20자 이내여야 합니다.', 'error')
         elif not username.isalnum():
@@ -335,6 +310,7 @@ def logout():
 
 # ──────────────────────────────
 # 라우트 - PDF 업로드 (관리자)
+# ── ✅ 변경 3: Cloudinary에 업로드 추가 ──
 # ──────────────────────────────
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -349,7 +325,6 @@ def upload():
         if grade not in GRADES or category not in CATEGORIES:
             flash('올바르지 않은 학년 또는 카테고리입니다.', 'error')
             return redirect(url_for('upload'))
-
         if not file or not file.filename.endswith('.pdf'):
             flash('PDF 파일만 업로드 가능합니다.', 'error')
             return redirect(url_for('upload'))
@@ -366,6 +341,14 @@ def upload():
         filename      = f"{unique_prefix}_{original_name}"
         save_path     = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
+
+        # ✅ Cloudinary에도 업로드 (로컬 저장 후 추가 업로드)
+        cloudinary.uploader.upload(
+            save_path,
+            public_id=filename,
+            resource_type='raw',
+            folder='황소자료실'
+        )
 
         new_pdf = PDF(
             title=title,
@@ -388,6 +371,11 @@ def upload():
 @admin_required
 def delete_pdf(pdf_id):
     pdf = PDF.query.get_or_404(pdf_id)
+    # ✅ Cloudinary에서도 삭제
+    try:
+        cloudinary.uploader.destroy(f"황소자료실/{pdf.filename}", resource_type='raw')
+    except:
+        pass
     try:
         os.remove(os.path.join(app.config['UPLOAD_FOLDER'], pdf.filename))
     except:
@@ -399,17 +387,27 @@ def delete_pdf(pdf_id):
 
 # ──────────────────────────────
 # 라우트 - PDF 다운로드 (워터마크 포함)
+# ── ✅ 변경 4: 로컬 없으면 Cloudinary에서 다운로드 ──
 # ──────────────────────────────
 @app.route('/download/<int:pdf_id>')
 @login_required
 def download(pdf_id):
     pdf  = PDF.query.get_or_404(pdf_id)
     user = User.query.get(session['user_id'])
-
     safe_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(pdf.filename))
+
+    # ✅ 로컬에 없으면 Cloudinary에서 받아서 임시 저장
     if not os.path.exists(safe_path):
-        flash('파일을 찾을 수 없습니다.', 'error')
-        return redirect(url_for('index'))
+        try:
+            import urllib.request
+            url = cloudinary.utils.cloudinary_url(
+                f"황소자료실/{pdf.filename}",
+                resource_type='raw'
+            )[0]
+            urllib.request.urlretrieve(url, safe_path)
+        except:
+            flash('파일을 찾을 수 없습니다.', 'error')
+            return redirect(url_for('index'))
 
     output = add_watermark(safe_path, user.username, f"{user.id}-{pdf.id}")
     return send_file(
@@ -593,9 +591,6 @@ def visit_logs():
     unique_ips = db.session.query(VisitLog.ip).distinct().count()
     return render_template('visits.html', logs=logs, total=total, unique_ips=unique_ips)
 
-# ──────────────────────────────
-# 라우트 - 로그인 실패 기록 (관리자)
-# ──────────────────────────────
 @app.route('/admin/loginfails')
 @login_required
 @admin_required
@@ -606,15 +601,11 @@ def login_fail_logs():
         LoginFailLog.ip,
         func.count(LoginFailLog.id).label('count')
     ).group_by(LoginFailLog.ip).order_by(func.count(LoginFailLog.id).desc()).all()
-
     return render_template('login_fails.html',
         logs     = logs,
         total    = total,
         ip_stats = ip_stats
     )
 
-# ──────────────────────────────
-# 실행
-# ──────────────────────────────
 if __name__ == '__main__':
     app.run(debug=False)
