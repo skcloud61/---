@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mt-4">
+
+  <!-- 제목 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📋 건의 게시판</h2>
+    <a href="{{ url_for('write_post') }}" class="btn btn-warning">✏️ 글 작성</a>
+  </div>
+
+  <!-- 게시글 목록 -->
+  {% if posts %}
+  <table class="table table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th style="width:60px;">번호</th>
+        <th>제목</th>
+        <th style="width:120px;">작성자</th>
+        <th style="width:160px;">작성일</th>
+        <th style="width:80px;">댓글</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for post in posts %}
+      <tr>
+        <td>{{ post.id }}</td>
+        <td>
+          <a href="{{ url_for('view_post', post_id=post.id) }}" class="text-decoration-none text-dark">
+            {{ post.title }}
+          </a>
+        </td>
+        <td>{{ post.author.username }}</td>
+        <td>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>💬 {{ post.post_comments|length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="alert alert-secondary text-center">
+    아직 작성된 게시글이 없어요. 첫 번째 글을 작성해보세요! 😊
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mt-4">
+
+  <!-- 제목 + 뒤로가기 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📊 방문 기록</h2>
+    <a href="{{ url_for('admin') }}" class="btn btn-secondary">← 관리자 페이지로</a>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1">총 방문 수</p>
+          <h3 class="fw-bold">{{ total }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1">고유 IP 수</p>
+          <h3 class="fw-bold">{{ unique_ips }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 기록 테이블 -->
+  <div class="table-responsive">
+    <table class="table table-hover table-bordered align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>번호</th>
+          <th>유저</th>
+          <th>IP</th>
+          <th>페이지</th>
+          <th>접속 시간</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.id }}</td>
+          <td>{{ log.username }}</td>
+          <td>{{ log.ip }}</td>
+          <td>{{ log.page }}</td>
+          <td>{{ log.visited_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+{% endblock %}

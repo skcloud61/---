@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mt-4">
+
+  <!-- 게시글 -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="mb-0">{{ post.title }}</h4>
+      {% if session.is_admin or session.user_id == post.author_id %}
+      <a href="{{ url_for('delete_post', post_id=post.id) }}"
+         class="btn btn-danger btn-sm"
+         onclick="return confirm('정말 삭제하시겠습니까?')">🗑️ 삭제</a>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        ✍️ {{ post.author.username }} &nbsp;|&nbsp;
+        🕐 {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}
+      </p>
+      <hr>
+      <p style="white-space: pre-wrap;">{{ post.content }}</p>
+    </div>
+  </div>
+
+  <!-- 목록으로 버튼 -->
+  <a href="{{ url_for('board') }}" class="btn btn-secondary mb-4">← 목록으로</a>
+
+  <!-- 댓글 목록 -->
+  <h5>💬 댓글 {{ post.post_comments|length }}개</h5>
+  <hr>
+
+  {% if post.post_comments %}
+  {% for comment in post.post_comments %}
+  <div class="card mb-2">
+    <div class="card-body py-2 d-flex justify-content-between align-items-center">
+      <div>
+        <span class="fw-bold me-2">{{ comment.author.username }}</span>
+        <span class="text-muted small">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        <p class="mb-0 mt-1">{{ comment.content }}</p>
+      </div>
+      {% if session.is_admin or session.user_id == comment.author_id %}
+      <a href="{{ url_for('delete_post_comment', comment_id=comment.id) }}"
+         class="btn btn-outline-danger btn-sm"
+         onclick="return confirm('댓글을 삭제하시겠습니까?')">🗑️</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="text-muted">아직 댓글이 없어요. 첫 댓글을 달아보세요! 😊</p>
+  {% endif %}
+
+  <!-- 댓글 작성 -->
+  <div class="mt-4">
+    <form method="POST" action="{{ url_for('add_post_comment', post_id=post.id) }}">
+      <div class="input-group">
+        <input type="text" name="content" class="form-control" placeholder="댓글을 입력해주세요" required>
+        <button type="submit" class="btn btn-warning">등록</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+{% endblock %}

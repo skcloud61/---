@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+
+  <h4 class="mb-4">로그인 실패 기록</h4>
+
+  <!-- 요약 카드 -->
+  <div class="row mb-4">
+    <div class="col-md-3 mb-3">
+      <div class="card text-center p-3 shadow-sm">
+        <span class="text-muted" style="font-size:0.85rem;">전체 실패 횟수</span>
+        <span style="font-size:2rem; font-weight:bold; color:#8B4513;">{{ total }}</span>
+      </div>
+    </div>
+    <div class="col-md-3 mb-3">
+      <div class="card text-center p-3 shadow-sm">
+        <span class="text-muted" style="font-size:0.85rem;">실패 IP 수</span>
+        <span style="font-size:2rem; font-weight:bold; color:#e74c3c;">{{ ip_stats|length }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- IP별 통계 -->
+  <h6 class="mb-2">IP별 실패 횟수</h6>
+  <table class="table table-bordered table-sm mb-4">
+    <thead style="background:#8B4513; color:white;">
+      <tr>
+        <th>IP</th>
+        <th>실패 횟수</th>
+        <th>위험도</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ip, count in ip_stats %}
+      <tr {% if count >= 10 %}style="background:#fff5f5;"{% endif %}>
+        <td>{{ ip }}</td>
+        <td>{{ count }}</td>
+        <td>
+          {% if count >= 10 %}
+            <span class="badge bg-danger">위험</span>
+          {% elif count >= 5 %}
+            <span class="badge bg-warning text-dark">주의</span>
+          {% else %}
+            <span class="badge bg-secondary">정상</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not ip_stats %}
+      <tr>
+        <td colspan="3" class="text-center text-muted py-3">기록이 없습니다.</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- 상세 기록 -->
+  <h6 class="mb-2">상세 기록 <span class="text-muted" style="font-size:0.8rem;">(최근 200건)</span></h6>
+  <table class="table table-bordered table-sm">
+    <thead style="background:#8B4513; color:white;">
+      <tr>
+        <th>시간</th>
+        <th>아이디</th>
+        <th>IP</th>
+        <th>실패 이유</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td style="font-size:0.8rem;">
+          {{ log.failed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+        </td>
+        <td>{{ log.username }}</td>
+        <td>{{ log.ip }}</td>
+        <td>
+          {% if '잠금' in log.reason %}
+            <span class="badge bg-danger">{{ log.reason }}</span>
+          {% elif '오류' in log.reason %}
+            <span class="badge bg-warning text-dark">{{ log.reason }}</span>
+          {% elif '정지' in log.reason %}
+            <span class="badge bg-dark">{{ log.reason }}</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ log.reason }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not logs %}
+      <tr>
+        <td colspan="4" class="text-center text-muted py-3">기록이 없습니다.</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+</div>
+{% endblock %}

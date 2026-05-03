@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- ── 필터 ── -->
+<div class="container mt-4">
+  <form method="GET" action="/" class="row g-2 mb-4">
+    <div class="col-auto">
+      <select name="grade" class="form-select" onchange="this.form.submit()">
+        <option value="">전체 학년</option>
+        {% for g in grades %}
+          <option value="{{ g }}" {{ 'selected' if selected_grade == g }}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="category" class="form-select" onchange="this.form.submit()">
+        <option value="">전체 유형</option>
+        {% for c in categories %}
+          <option value="{{ c }}" {{ 'selected' if selected_category == c }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <!-- ── PDF 카드 목록 ── -->
+  {% if pdfs %}
+  <div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for pdf in pdfs %}
+    <div class="col">
+      <div class="card h-100 shadow-sm" id="{{ pdf.id }}">
+        <div class="card-body">
+
+          <!-- 학년 / 유형 / 삭제 -->
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <span class="badge bg-primary me-1">{{ pdf.grade }}</span>
+              <span class="badge bg-secondary">{{ pdf.category }}</span>
+            </div>
+            {% if session.is_admin %}
+              <a href="/delete_pdf/{{ pdf.id }}"
+                 class="btn btn-danger btn-sm"
+                 onclick="return confirm('정말 삭제할까요?')">🗑️</a>
+            {% endif %}
+          </div>
+
+          <!-- 제목 & 날짜 -->
+          <h5 class="card-title">📄 {{ pdf.title }}</h5>
+          <p class="text-muted small">{{ pdf.uploaded_at.strftime('%Y-%m-%d') }}</p>
+
+          <!-- 다운로드 + 좋아요 -->
+          <div class="d-flex gap-2 mb-3">
+            <a href="/download/{{ pdf.id }}" class="btn btn-dark btn-sm">⬇️ 다운로드</a>
+            <button class="btn btn-sm {{ 'btn-danger' if pdf.id in liked_ids else 'btn-outline-danger' }}"
+                    data-id="{{ pdf.id }}"
+                    onclick="toggleLike({{ pdf.id }}, this)">
+              {{ '❤️' if pdf.id in liked_ids else '🤍' }}
+              <span class="like-count">{{ pdf.likes|length }}</span>
+            </button>
+          </div>
+
+          <!-- 댓글 목록 -->
+          <div class="comment-section">
+            <div class="comment-list mb-2">
+              {% for comment in pdf.comments %}
+              <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                <div>
+                  <span class="fw-bold small me-1">{{ comment.user.username }}</span>
+                  <span class="small">{{ comment.content }}</span>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="text-muted small">{{ comment.created_at.strftime('%m/%d') }}</span>
+                  {% if session.is_admin or comment.user_id == session.user_id %}
+                    <a href="/delete_comment/{{ comment.id }}"
+                       class="btn btn-sm btn-outline-danger py-0 px-1"
+                       onclick="return confirm('댓글을 삭제할까요?')">✕</a>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- 댓글 입력 -->
+            <form method="POST" action="/comment/{{ pdf.id }}" class="d-flex gap-1">
+              <input type="text" name="content"
+                     class="form-control form-control-sm"
+                     placeholder="댓글을 입력하세요..." maxlength="200" required>
+              <button type="submit" class="btn btn-dark btn-sm">등록</button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="text-center text-muted mt-5">
+    <p>📭 등록된 자료가 없습니다.</p>
+    {% if session.is_admin %}
+      <a href="/upload" class="btn btn-dark">자료를 올려주세요!</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── 좋아요 JS ── -->
+<script>
+function toggleLike(pdfId, btn) {
+    fetch(`/like/${pdfId}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        btn.querySelector('.like-count').textContent = data.count;
+        if (data.liked) {
+            btn.innerHTML = '❤️ <span class="like-count">' + data.count + '</span>';
+            btn.classList.add('btn-danger');
+            btn.classList.remove('btn-outline-danger');
+        } else {
+            btn.innerHTML = '🤍 <span class="like-count">' + data.count + '</span>';
+            btn.classList.add('btn-outline-danger');
+            btn.classList.remove('btn-danger');
+        }
+    });
+}
+</script>
+
+{% endblock %}
