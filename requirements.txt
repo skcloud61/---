@@ -5,3 +5,4 @@ reportlab
 pypdf2
 cloudinary
 gunicorn
+pycryptodome
