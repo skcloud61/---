@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from sqlalchemy import func
 import os, io, secrets
@@ -11,7 +11,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from PyPDF2 import PdfReader, PdfWriter
-# ── ✅ 변경 1: Cloudinary 추가 ──
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
@@ -27,28 +26,29 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db = SQLAlchemy(app)
 os.makedirs('uploads', exist_ok=True)
 
-# ── ✅ 변경 2: Cloudinary 설정 추가 ──
+# 한국시간 설정
+KST = timezone(timedelta(hours=9))
+
 cloudinary.config(
     cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dspi76gpo'),
     api_key    = os.environ.get('CLOUDINARY_API_KEY', '129521586826764'),
     api_secret = os.environ.get('CLOUDINARY_API_SECRET', 'y080TBqpcuuOLb3thTzbGISFE8Q')
 )
-
 pdfmetrics.registerFont(TTFont('NanumGothic', 'NanumGothic.ttf'))
 
 # ──────────────────────────────
 # 모델
 # ──────────────────────────────
 class User(db.Model):
-    id              = db.Column(db.Integer, primary_key=True)
-    username        = db.Column(db.String(50), unique=True, nullable=False)
-    password        = db.Column(db.String(200), nullable=False)
-    is_admin        = db.Column(db.Boolean, default=False)
-    is_banned       = db.Column(db.Boolean, default=False)
-    ban_type        = db.Column(db.String(20), default=None)
-    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
-    login_attempts  = db.Column(db.Integer, default=0)
-    locked_until    = db.Column(db.DateTime, nullable=True)
+    id             = db.Column(db.Integer, primary_key=True)
+    username       = db.Column(db.String(50), unique=True, nullable=False)
+    password       = db.Column(db.String(200), nullable=False)
+    is_admin       = db.Column(db.Boolean, default=False)
+    is_banned      = db.Column(db.Boolean, default=False)
+    ban_type       = db.Column(db.String(20), default=None)
+    created_at     = db.Column(db.DateTime, default=lambda: datetime.now(KST))
+    login_attempts = db.Column(db.Integer, default=0)
+    locked_until   = db.Column(db.DateTime, nullable=True)
 
 class PDF(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -57,9 +57,9 @@ class PDF(db.Model):
     grade       = db.Column(db.String(50), nullable=False)
     category    = db.Column(db.String(50), nullable=False)
     uploader_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-    likes        = db.relationship('Like', backref='pdf', lazy=True, cascade='all, delete-orphan')
-    pdf_comments = db.relationship('PdfComment', backref='pdf', lazy=True, cascade='all, delete-orphan')
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(KST))
+    likes       = db.relationship('Like', backref='pdf', lazy=True, cascade='all, delete-orphan')
+    comments    = db.relationship('PdfComment', backref='pdf', lazy=True, cascade='all, delete-orphan')
 
 class Like(db.Model):
     id      = db.Column(db.Integer, primary_key=True)
@@ -71,7 +71,7 @@ class PdfComment(db.Model):
     content    = db.Column(db.String(500), nullable=False)
     user_id    = db.Column(db.Integer, db.ForeignKey('user.id'))
     pdf_id     = db.Column(db.Integer, db.ForeignKey('pdf.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(KST))
     user       = db.relationship('User', backref='pdf_comments')
 
 class Post(db.Model):
@@ -80,7 +80,7 @@ class Post(db.Model):
     content       = db.Column(db.Text, nullable=False)
     author_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     author        = db.relationship('User', backref='posts')
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at    = db.Column(db.DateTime, default=lambda: datetime.now(KST))
     post_comments = db.relationship('PostComment', backref='post', lazy=True, cascade='all, delete-orphan')
 
 class PostComment(db.Model):
@@ -89,7 +89,7 @@ class PostComment(db.Model):
     author_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     author     = db.relationship('User', backref='post_comments')
     post_id    = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(KST))
 
 class VisitLog(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -97,7 +97,7 @@ class VisitLog(db.Model):
     username   = db.Column(db.String(50), default='비로그인')
     ip         = db.Column(db.String(50), nullable=False)
     page       = db.Column(db.String(200), nullable=False)
-    visited_at = db.Column(db.DateTime, default=datetime.utcnow)
+    visited_at = db.Column(db.DateTime, default=lambda: datetime.now(KST))
     user       = db.relationship('User', backref='visit_logs')
 
 class LoginFailLog(db.Model):
@@ -105,7 +105,7 @@ class LoginFailLog(db.Model):
     username  = db.Column(db.String(50), nullable=False)
     ip        = db.Column(db.String(50), nullable=False)
     reason    = db.Column(db.String(100), nullable=False)
-    failed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    failed_at = db.Column(db.DateTime, default=lambda: datetime.now(KST))
 
 # ──────────────────────────────
 # DB 초기화
@@ -127,6 +127,7 @@ with app.app_context():
 # 방문 기록 자동 저장
 # ──────────────────────────────
 EXCLUDE_PATHS = ['/static', '/favicon.ico', '/admin/visits', '/admin/loginfails']
+
 @app.before_request
 def log_visit():
     for path in EXCLUDE_PATHS:
@@ -158,7 +159,6 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         client_ip = request.remote_addr
-        # 100.64.x.x 대역 전부 허용 추가
         if client_ip not in ADMIN_IPS and not client_ip.startswith('100.64.'):
             return render_template('403.html', ip=client_ip), 403
         if not session.get('is_admin'):
@@ -200,7 +200,7 @@ GRADES = [
     '중학교 1학년', '중학교 2학년', '중학교 3학년',
     '고등학교 1학년'
 ]
-CATEGORIES   = ['단원평가', '단원정리', '퀵테스트', '기타']
+CATEGORIES = ['단원평가', '단원정리', '퀵테스트', '기타']
 ALLOWED_MIME = {'application/pdf'}
 
 # ──────────────────────────────
@@ -247,8 +247,8 @@ def login():
             db.session.add(LoginFailLog(username=username, ip=ip, reason=f'정지된 계정 ({ban_msg})'))
             db.session.commit()
             flash(f'이용이 {ban_msg}된 계정입니다.', 'error')
-        elif user.locked_until and datetime.utcnow() < user.locked_until:
-            remaining = (user.locked_until - datetime.utcnow()).seconds // 60
+        elif user.locked_until and datetime.now(KST) < user.locked_until:
+            remaining = (user.locked_until - datetime.now(KST)).seconds // 60
             db.session.add(LoginFailLog(username=username, ip=ip, reason=f'잠금 상태 ({remaining}분 남음)'))
             db.session.commit()
             flash(f'로그인 시도가 너무 많습니다. {remaining}분 후 다시 시도해주세요.', 'error')
@@ -256,7 +256,7 @@ def login():
             user.login_attempts += 1
             reason = f'비밀번호 오류 ({user.login_attempts}/5)'
             if user.login_attempts >= 5:
-                user.locked_until   = datetime.utcnow() + timedelta(minutes=15)
+                user.locked_until   = datetime.now(KST) + timedelta(minutes=15)
                 user.login_attempts = 0
                 reason = '비밀번호 5회 오류 → 잠금'
                 flash('로그인 5회 실패. 15분간 잠금됩니다.', 'error')
@@ -312,7 +312,6 @@ def logout():
 
 # ──────────────────────────────
 # 라우트 - PDF 업로드 (관리자)
-# ── ✅ 변경 3: Cloudinary에 업로드 추가 ──
 # ──────────────────────────────
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -323,31 +322,24 @@ def upload():
         grade    = request.form['grade']
         category = request.form['category']
         file     = request.files['file']
-
         if grade not in GRADES or category not in CATEGORIES:
             flash('올바르지 않은 학년 또는 카테고리입니다.', 'error')
             return redirect(url_for('upload'))
         if not file or not file.filename.endswith('.pdf'):
             flash('PDF 파일만 업로드 가능합니다.', 'error')
             return redirect(url_for('upload'))
-
-       
         file.seek(0)
-
         original_name = secure_filename(file.filename)
         unique_prefix = secrets.token_hex(8)
         filename      = f"{unique_prefix}_{original_name}"
         save_path     = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
-
-        # ✅ Cloudinary에도 업로드 (로컬 저장 후 추가 업로드)
         cloudinary.uploader.upload(
             save_path,
             public_id=filename,
             resource_type='raw',
             folder='황소자료실'
         )
-
         new_pdf = PDF(
             title=title,
             filename=filename,
@@ -369,7 +361,6 @@ def upload():
 @admin_required
 def delete_pdf(pdf_id):
     pdf = PDF.query.get_or_404(pdf_id)
-    # ✅ Cloudinary에서도 삭제
     try:
         cloudinary.uploader.destroy(f"황소자료실/{pdf.filename}", resource_type='raw')
     except:
@@ -385,7 +376,6 @@ def delete_pdf(pdf_id):
 
 # ──────────────────────────────
 # 라우트 - PDF 다운로드 (워터마크 포함)
-# ── ✅ 변경 4: 로컬 없으면 Cloudinary에서 다운로드 ──
 # ──────────────────────────────
 @app.route('/download/<int:pdf_id>')
 @login_required
@@ -393,8 +383,6 @@ def download(pdf_id):
     pdf  = PDF.query.get_or_404(pdf_id)
     user = User.query.get(session['user_id'])
     safe_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(pdf.filename))
-
-    # ✅ 로컬에 없으면 Cloudinary에서 받아서 임시 저장
     if not os.path.exists(safe_path):
         try:
             import urllib.request
@@ -406,7 +394,6 @@ def download(pdf_id):
         except:
             flash('파일을 찾을 수 없습니다.', 'error')
             return redirect(url_for('index'))
-
     output = add_watermark(safe_path, user.username, f"{user.id}-{pdf.id}")
     return send_file(
         output,
@@ -433,7 +420,7 @@ def like(pdf_id):
     return {'liked': existing is None, 'count': count}
 
 # ──────────────────────────────
-# 라우트 - PDF 댓글
+# 라우트 - PDF 댓글 등록
 # ──────────────────────────────
 @app.route('/comment/<int:pdf_id>', methods=['POST'])
 @login_required
@@ -450,6 +437,30 @@ def add_comment(pdf_id):
         flash('댓글은 300자 이내로 작성해주세요.', 'error')
     return redirect(url_for('index') + f'#{pdf_id}')
 
+# ──────────────────────────────
+# 라우트 - PDF 댓글 수정
+# ──────────────────────────────
+@app.route('/edit_comment/<int:comment_id>', methods=['POST'])
+@login_required
+def edit_comment(comment_id):
+    comment = PdfComment.query.get_or_404(comment_id)
+    pdf_id  = comment.pdf_id
+    if not session.get('is_admin') and comment.user_id != session['user_id']:
+        flash('수정 권한이 없습니다.', 'error')
+        return redirect(url_for('index') + f'#{pdf_id}')
+    content = request.form['content'].strip()
+    if not content:
+        flash('내용을 입력해주세요.', 'error')
+    elif len(content) > 300:
+        flash('댓글은 300자 이내로 작성해주세요.', 'error')
+    else:
+        comment.content = content
+        db.session.commit()
+    return redirect(url_for('index') + f'#{pdf_id}')
+
+# ──────────────────────────────
+# 라우트 - PDF 댓글 삭제
+# ──────────────────────────────
 @app.route('/delete_comment/<int:comment_id>')
 @login_required
 def delete_comment(comment_id):
@@ -463,7 +474,7 @@ def delete_comment(comment_id):
     return redirect(url_for('index') + f'#{pdf_id}')
 
 # ──────────────────────────────
-# 라우트 - 건의 게시판
+# 라우트 - 건의 게시판 목록
 # ──────────────────────────────
 @app.route('/board')
 @login_required
@@ -471,6 +482,9 @@ def board():
     posts = Post.query.order_by(Post.created_at.desc()).all()
     return render_template('board.html', posts=posts)
 
+# ──────────────────────────────
+# 라우트 - 게시글 작성
+# ──────────────────────────────
 @app.route('/board/write', methods=['GET', 'POST'])
 @login_required
 def write_post():
@@ -491,12 +505,45 @@ def write_post():
             return redirect(url_for('board'))
     return render_template('write_post.html')
 
+# ──────────────────────────────
+# 라우트 - 게시글 보기
+# ──────────────────────────────
 @app.route('/board/<int:post_id>')
 @login_required
 def view_post(post_id):
     post = Post.query.get_or_404(post_id)
     return render_template('view_post.html', post=post)
 
+# ──────────────────────────────
+# 라우트 - 게시글 수정
+# ──────────────────────────────
+@app.route('/board/edit/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    if not session.get('is_admin') and post.author_id != session['user_id']:
+        flash('수정 권한이 없습니다.', 'error')
+        return redirect(url_for('board'))
+    if request.method == 'POST':
+        title   = request.form['title'].strip()
+        content = request.form['content'].strip()
+        if not title or not content:
+            flash('제목과 내용을 모두 입력해주세요.', 'error')
+        elif len(title) > 100:
+            flash('제목은 100자 이내로 작성해주세요.', 'error')
+        elif len(content) > 2000:
+            flash('내용은 2000자 이내로 작성해주세요.', 'error')
+        else:
+            post.title   = title
+            post.content = content
+            db.session.commit()
+            flash('게시글이 수정되었습니다.', 'success')
+            return redirect(url_for('view_post', post_id=post_id))
+    return render_template('edit_post.html', post=post)
+
+# ──────────────────────────────
+# 라우트 - 게시글 삭제
+# ──────────────────────────────
 @app.route('/board/delete/<int:post_id>')
 @login_required
 def delete_post(post_id):
@@ -509,6 +556,9 @@ def delete_post(post_id):
     flash('게시글이 삭제되었습니다.', 'success')
     return redirect(url_for('board'))
 
+# ──────────────────────────────
+# 라우트 - 게시판 댓글 등록
+# ──────────────────────────────
 @app.route('/board/<int:post_id>/comment', methods=['POST'])
 @login_required
 def add_post_comment(post_id):
@@ -524,6 +574,30 @@ def add_post_comment(post_id):
         flash('댓글은 300자 이내로 작성해주세요.', 'error')
     return redirect(url_for('view_post', post_id=post_id))
 
+# ──────────────────────────────
+# 라우트 - 게시판 댓글 수정
+# ──────────────────────────────
+@app.route('/board/comment/edit/<int:comment_id>', methods=['POST'])
+@login_required
+def edit_post_comment(comment_id):
+    comment = PostComment.query.get_or_404(comment_id)
+    post_id = comment.post_id
+    if not session.get('is_admin') and comment.author_id != session['user_id']:
+        flash('수정 권한이 없습니다.', 'error')
+        return redirect(url_for('view_post', post_id=post_id))
+    content = request.form['content'].strip()
+    if not content:
+        flash('내용을 입력해주세요.', 'error')
+    elif len(content) > 300:
+        flash('댓글은 300자 이내로 작성해주세요.', 'error')
+    else:
+        comment.content = content
+        db.session.commit()
+    return redirect(url_for('view_post', post_id=post_id))
+
+# ──────────────────────────────
+# 라우트 - 게시판 댓글 삭제
+# ──────────────────────────────
 @app.route('/board/comment/delete/<int:comment_id>')
 @login_required
 def delete_post_comment(comment_id):
@@ -606,6 +680,5 @@ def login_fail_logs():
     )
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
