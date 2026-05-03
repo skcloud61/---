@@ -1,3 +1,5 @@
+from PyPDF2 import PdfReader, PdfWriter
+import io
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -383,7 +385,7 @@ def delete_pdf(pdf_id):
     return redirect(url_for('index'))
 
 # ──────────────────────────────
-# 라우트 - PDF 다운로드 (워터마크 포함)
+# 라우트 - PDF 다운로드 (워터마크 + 편집 불가)
 # ──────────────────────────────
 @app.route('/download/<int:pdf_id>')
 @login_required
@@ -391,6 +393,7 @@ def download(pdf_id):
     pdf  = PDF.query.get_or_404(pdf_id)
     user = User.query.get(session['user_id'])
     safe_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(pdf.filename))
+    
     if not os.path.exists(safe_path):
         try:
             import urllib.request
@@ -402,7 +405,28 @@ def download(pdf_id):
         except:
             flash('파일을 찾을 수 없습니다.', 'error')
             return redirect(url_for('index'))
-    output = add_watermark(safe_path, user.username, f"{user.id}-{pdf.id}")
+
+    # 워터마크 추가
+    watermarked = add_watermark(safe_path, user.username, f"{user.id}-{pdf.id}")
+
+    # 편집 불가능하게 암호화
+    reader = PdfReader(watermarked)
+    writer = PdfWriter()
+
+    for page in reader.pages:
+        writer.add_page(page)
+
+    writer.encrypt(
+        user_password="",
+        owner_password="HwangSo@2025!",
+        use_128bit=True,
+        permissions_flag=4
+    )
+
+    output = io.BytesIO()
+    writer.write(output)
+    output.seek(0)
+
     return send_file(
         output,
         as_attachment=True,
