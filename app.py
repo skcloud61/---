@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy import func
-import os, io, secrets, magic
+import os, io, secrets
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
