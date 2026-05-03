@@ -153,11 +153,13 @@ def login_required(f):
     return decorated
 
 ADMIN_IPS = ['127.0.0.1', '::1', '121.165.139.150']
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         client_ip = request.remote_addr
-        if client_ip not in ADMIN_IPS:
+        # 100.64.x.x 대역 전부 허용 추가
+        if client_ip not in ADMIN_IPS and not client_ip.startswith('100.64.'):
             return render_template('403.html', ip=client_ip), 403
         if not session.get('is_admin'):
             flash('관리자만 접근할 수 있습니다.', 'error')
