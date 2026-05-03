@@ -133,6 +133,15 @@ def log_visit():
     for path in EXCLUDE_PATHS:
         if request.path.startswith(path):
             return
+
+    # 로그인 중인 유저가 정지됐는지 매 요청마다 확인
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user and user.is_banned:
+            session.clear()
+            flash('이용이 정지된 계정입니다.', 'error')
+            return redirect(url_for('login'))
+
     user_id  = session.get('user_id')
     username = session.get('username', '비로그인')
     ip       = request.remote_addr
@@ -140,7 +149,6 @@ def log_visit():
     log = VisitLog(user_id=user_id, username=username, ip=ip, page=page)
     db.session.add(log)
     db.session.commit()
-
 # ──────────────────────────────
 # 데코레이터
 # ──────────────────────────────
