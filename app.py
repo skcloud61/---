@@ -21,7 +21,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+app.config['MAX_CONTENT_LENGTH'] = 50 _1024_ 1024
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db = SQLAlchemy(app)
@@ -329,11 +329,7 @@ def upload():
             flash('PDF 파일만 업로드 가능합니다.', 'error')
             return redirect(url_for('upload'))
 
-        file_content = file.read(2048)
-        mime = magic.from_buffer(file_content, mime=True)
-        if mime not in ALLOWED_MIME:
-            flash('올바른 PDF 파일이 아닙니다.', 'error')
-            return redirect(url_for('upload'))
+       
         file.seek(0)
 
         original_name = secure_filename(file.filename)
