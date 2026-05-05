@@ -38,17 +38,17 @@
             {% if session.is_admin %}
               <a href="/delete_pdf/{{ pdf.id }}"
                  class="btn btn-danger btn-sm"
-                 onclick="return confirm('정말 삭제할까요?')">🗑️</a>
+                 onclick="return confirm('정말 삭제할까요?')"></a>
             {% endif %}
           </div>
 
           <!-- 제목 & 날짜 -->
-          <h5 class="card-title">📄 {{ pdf.title }}</h5>
+          <h5 class="card-title"> {{ pdf.title }}</h5>
           <p class="text-muted small">{{ pdf.uploaded_at.strftime('%Y-%m-%d') }}</p>
 
           <!-- 다운로드 + 좋아요 -->
           <div class="d-flex gap-2 mb-3">
-            <a href="/download/{{ pdf.id }}" class="btn btn-dark btn-sm">⬇️ 다운로드</a>
+            <a href="/download/{{ pdf.id }}" class="btn btn-dark btn-sm"> 다운로드</a>
             <button class="btn btn-sm {{ 'btn-danger' if pdf.id in liked_ids else 'btn-outline-danger' }}"
                     data-id="{{ pdf.id }}"
                     onclick="toggleLike({{ pdf.id }}, this)">
