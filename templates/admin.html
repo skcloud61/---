@@ -2,12 +2,12 @@
 {% block content %}
 
 <div class="container mt-4">
-  <h2 class="mb-4">⚙️ 관리자 페이지</h2>
+  <h2 class="mb-4"> 관리자 페이지</h2>
 
   <!-- 회원 수 & 방문기록 버튼 -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <span>전체 회원 수: <strong>{{ users|length }}</strong>명</span>
-    <a href="{{ url_for('visit_logs') }}" class="btn btn-success btn-sm">👥 방문 기록 보기</a>
+    <a href="{{ url_for('visit_logs') }}" class="btn btn-success btn-sm"> 방문 기록 보기</a>
   </div>
 
   <!-- 회원 테이블 -->
@@ -43,18 +43,18 @@
             <a href="/admin/unban/{{ user.id }}"
                class="btn btn-success btn-sm"
                onclick="return confirm('{{ user.username }} 님의 정지를 해제할까요?')">
-               ✅ 정지 해제
+                정지 해제
             </a>
           {% else %}
             <a href="/admin/ban/{{ user.id }}"
                class="btn btn-warning btn-sm"
                onclick="return confirm('{{ user.username }} 님을 일시 정지할까요?')">
-               ⏸️ 일시 정지
+                일시 정지
             </a>
             <a href="/admin/permban/{{ user.id }}"
                class="btn btn-danger btn-sm"
                onclick="return confirm('{{ user.username }} 님을 영구 정지할까요?')">
-               🚫 영구 정지
+                영구 정지
             </a>
           {% endif %}
         </td>
